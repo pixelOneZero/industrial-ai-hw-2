@@ -1,7 +1,11 @@
 function main()
     close all;
     %% Data Loading
-    filepath = './Training/Faulty/'; traindata = data_loading(filepath);
+    filepath = './Training/Faulty/';
+    filepathHealthy = './Training/Healthy/';
+    traindata = data_loading(filepath);
+    traindata = [traindata, data_loading(filepathHealthy)];
+
     %filepath = './Testing/'; testdata = data_loading(filepath);
 
     %% FFT Analysis  on Training Data
@@ -13,8 +17,6 @@ function main()
         traindata(k).frequency = f;
         traindata(k).amplitude = amp;
     end
-
-    %fprintf('length(traindata) is %s ', filepath)
 
     %% Data Visualization on Training Data
     dataid= [1,20];  % change the sample id to visualize different data
@@ -259,7 +261,7 @@ function data_viz(data, dataid)
 end
 
 function alldata = data_loading(filepath)
-    matlab_version = 1; %leave as 1 if runninng matlab 2018. change to 0 if using matlab 2021
+    matlab_version = 0; %leave as 1 if runninng matlab 2018. change to 0 if using matlab 2021
 
     files = dir([filepath,'/*.txt']) ;   % you are in the folder of files
     fprintf('filepath is: %s ', filepath);
@@ -280,8 +282,7 @@ function alldata = data_loading(filepath)
     for i = 1:N
         thisfile =[files(i).folder,'/', files(i).name];
         fprintf('Converting data file %s \n', thisfile)
-        A = ['matlab_version ------------------------------> %s ', matlab_version];
-        disp(A);
+
         T = readtable(thisfile);
         if matlab_version == 1
             T = table2array(T(5:end,1));
