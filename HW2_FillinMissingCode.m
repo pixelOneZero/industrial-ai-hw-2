@@ -6,7 +6,7 @@ function main()
     traindata = data_loading(filepath);
     traindata = [traindata, data_loading(filepathHealthy)];
 
-    %filepath = './Testing/'; testdata = data_loading(filepath);
+    filepathTesting = './Testing/'; testdata = data_loading(filepathTesting);
 
     %% FFT Analysis  on Training Data
     fs = 2560; % Hz
@@ -19,7 +19,7 @@ function main()
     end
 
     %% Data Visualization on Training Data
-    dataid= [1,20];  % change the sample id to visualize different data
+    dataid= [1,21];  % change the sample id to visualize different data
     data_viz(traindata, dataid);
 
     %% Feature Extraction on Training Data
@@ -44,7 +44,7 @@ function main()
 
      X = feamat;
      y = traindata.label;
-     twoclass_fisher(X,y);
+     fscore = twoclass_fisher(X,[0,1]);
 
 
 %     **                      Please fill in your code here !                                                       **
@@ -62,7 +62,8 @@ function main()
 % the matlab function "mapstd" is recommended
 %     **********************************************************************************************
 %     **                                                                                                                              ** 
-%     **                      Please fill in your code here !                                                       **
+%     **                      Please fill in your code here !  
+    [traindataNormalized,PS] = mapstd(feamat) 
 %     **                                                                                                                              **
 %     **********************************************************************************************
 
@@ -77,8 +78,8 @@ function main()
 
     % b (bias), dev (model deviance), stats (miscellaneous statistics)
     % glmval predicts the label (0 or 1, faulty or healthy) for new data
-    [b, dev, stats] = glmfit(feamat, label, 'binomial');
-    prob = glmval(b, newfeamat, 'logit');
+    [b, dev, stats] = glmfit(traindataNormalized, [0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1], 'binomial');
+    prob = glmval(b, traindataNormalized, 'logit');
     if prob > 0.5
         print('probability of class 1')
     else
@@ -112,7 +113,8 @@ function main()
 % the matlab function "mapstd" is recommended
 %     **********************************************************************************************
 %     **                                                                                                                              ** 
-%     **                      Please fill in your code here !                                                       **
+%     **                      Please fill in your code here !    
+    [testdataNormalized,PS] = mapstd(testfeamat) 
 %     **                                                                                                                              **
 %     **********************************************************************************************
     
@@ -122,10 +124,17 @@ function main()
 % should be define as variable "cv"
 %     **********************************************************************************************
 %     **                                                                                                                              ** 
-%     **                      Please fill in your code here !                                                       **
+%     **                      Please fill in your code here !
+    [b, dev, stats] = glmfit(testdataNormalized, [0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1], 'binomial');
+    probTest = glmval(b, testdataNormalized, 'logit');
+    if probTest > 0.5
+        print('probability of class 1');
+    else
+        print('probability of class 0');
+    end
 %     **                                                                                                                              **
 %     **********************************************************************************************
-    figure; plot(cv,'x-'); xlabel('Sample ID'); ylabel('Health Value')
+    figure; plot(probTest,'x-'); xlabel('Sample ID'); ylabel('Health Value')
 
 end
 function fscore=twoclass_fisher(X,y)
@@ -190,7 +199,8 @@ function [feavec,feaname] = feature_extraction(d)
 
 
     feavec = feavec(:);
-    feaname = {'rms','peak2peak','skewness','kurtosis','1xrot','2xrot','3xrot'};
+    feaname = {'rms','peak2peak','skewness','kurtosis'};
+    %feaname = {'rms','peak2peak','skewness','kurtosis','1xrot','2xrot','3xrot'};
 end
 
 function [t, f, amp]= FFTAnalysis(x, fs)
