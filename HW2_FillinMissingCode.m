@@ -34,7 +34,10 @@ function main()
 
     %% Feature Selection - Training Data
     feamat = [traindata.feature]';
-    label = [traindata.label];
+    label = [traindata.label]';
+
+    disp(size(label));
+    disp(unique(label));
 
 % Please use the "twoclass_fisher" subfunction to compute the fisher score
 % for individual features
@@ -43,8 +46,8 @@ function main()
 %     ** 
 
      X = feamat;
-     y = traindata.label;
-     fscore = twoclass_fisher(X,[0,1]);
+     y = [traindata.label]';
+     fscore = twoclass_fisher(X,y);
 
 
 %     **                      Please fill in your code here !                                                       **
@@ -78,13 +81,10 @@ function main()
 
     % b (bias), dev (model deviance), stats (miscellaneous statistics)
     % glmval predicts the label (0 or 1, faulty or healthy) for new data
-    [b, dev, stats] = glmfit(traindataNormalized, [0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1], 'binomial');
+    % [0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1]
+    [b, dev, stats] = glmfit(traindataNormalized, label, 'binomial');
     prob = glmval(b, traindataNormalized, 'logit');
-    if prob > 0.5
-        print('probability of class 1')
-    else
-        print('probability of class 0')
-    end
+
 %     **                      Please fill in your code here !                                                       **
 %     **                                                                                                                              **
 %     **********************************************************************************************
@@ -122,18 +122,14 @@ function main()
 %     **********************************************************************************************
 %     **                                                                                                                              ** 
 %     **                      Please fill in your code here !
-    [b, dev, stats] = glmfit(testdataNormalized, [0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1], 'binomial');
-    probTest = glmval(b, testdataNormalized, 'logit');
-    if probTest > 0.5
-        print('probability of class 1');
-    else
-        print('probability of class 0');
-    end
+    cv = glmval(b, testdataNormalized, 'logit');
+
 %     **                                                                                                                              **
 %     **********************************************************************************************
-    figure; plot(probTest,'x-'); xlabel('Sample ID'); ylabel('Health Value')
+    figure; plot(cv,'x-'); xlabel('Sample ID'); ylabel('Health Value')
 
 end
+
 function fscore=twoclass_fisher(X,y)
     uniclass = unique(y);
     
@@ -185,6 +181,12 @@ function [feavec,feaname] = feature_extraction(d)
     feavec(2) = peak2peak(x);
     feavec(3) = skewness(x);
     feavec(4) = kurtosis(x);
+
+    % Please extract the vibration features for the 1x, 2x, 3x rotating
+    % frequency (the frequency range can be   1xRot +/- 5Hz)
+    % **********************************************************************************************
+    % **                                                                                                                              ** 
+
     % extracting frequency features: 1xRotating Frequency, 2xRotating
     freqRanges = rotatingFrequency * (1:3); % 1x, 2x, 3x rotating frequencies
     for i = 1:length(freqRanges)
@@ -197,15 +199,6 @@ function [feavec,feaname] = feature_extraction(d)
             feavec(4+i) = 0; % If no frequencies are in the window, set feature to 0
         end
     end
-
-    % Please extract the vibration features for the 1x, 2x, 3x rotating
-    % frequency (the frequency range can be   1xRot +/- 5Hz)
-%     **********************************************************************************************
-%     **                                                                                                                              ** 
-
-    %feavec(5)=;
-    %feavec(6)=;
-    %feavec(7)=;
 
 
 %     **
