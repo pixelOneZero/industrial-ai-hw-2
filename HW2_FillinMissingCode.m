@@ -3,8 +3,8 @@ function main()
     %% Data Loading
     filepath = './Training/Faulty/';
     filepathHealthy = './Training/Healthy/';
-    traindata = data_loading(filepath);
-    traindata = [traindata, data_loading(filepathHealthy)];
+    traindata = data_loading(filepathHealthy);
+    traindata = [traindata, data_loading(filepath)];
 
     filepathTesting = './Testing/'; testdata = data_loading(filepathTesting);
 
@@ -89,10 +89,6 @@ function main()
 %     **                                                                                                                              **
 %     **********************************************************************************************
 
-
-
-
-
     %% Feature Extraction - Testing Data
     for k = 1:length(testdata)
         x = testdata(k).signal;
@@ -107,6 +103,7 @@ function main()
 
     testfeamat = [testdata.feature]';
     testfeamat = testfeamat(:, feaid); % retain the useful features
+    
     %% Feature Normalization  - Testing Data
 
 % Please fill in the  feature normalization code for the testing data
@@ -181,6 +178,7 @@ function [feavec,feaname] = feature_extraction(d)
     x = d.signal;
     f = d.frequency;
     amp = d.amplitude;
+    rotatingFrequency = 20;
 
     % extracting statistical features: rms,  p2p, skewness, kurtosis (feel free to add other features to compare)
     feavec(1) = rms(x);
@@ -188,19 +186,35 @@ function [feavec,feaname] = feature_extraction(d)
     feavec(3) = skewness(x);
     feavec(4) = kurtosis(x);
     % extracting frequency features: 1xRotating Frequency, 2xRotating
+    freqRanges = rotatingFrequency * (1:3); % 1x, 2x, 3x rotating frequencies
+    for i = 1:length(freqRanges)
+        targetFreq = freqRanges(i);
+        freqWindow = (f >= (targetFreq - 5)) & (f <= (targetFreq + 5));
+        if any(freqWindow)
+            % Calculate mean amplitude in the frequency window as a feature
+            feavec(4+i) = mean(amp(freqWindow));
+        else
+            feavec(4+i) = 0; % If no frequencies are in the window, set feature to 0
+        end
+    end
 
     % Please extract the vibration features for the 1x, 2x, 3x rotating
     % frequency (the frequency range can be   1xRot +/- 5Hz)
 %     **********************************************************************************************
 %     **                                                                                                                              ** 
-%     **                      Please fill in your code here !                                                       **
+
+    %feavec(5)=;
+    %feavec(6)=;
+    %feavec(7)=;
+
+
+%     **
 %     **                                                                                                                              **
 %     **********************************************************************************************
 
 
     feavec = feavec(:);
-    feaname = {'rms','peak2peak','skewness','kurtosis'};
-    %feaname = {'rms','peak2peak','skewness','kurtosis','1xrot','2xrot','3xrot'};
+    feaname = {'rms','peak2peak','skewness','kurtosis','1xrot','2xrot','3xrot'};
 end
 
 function [t, f, amp]= FFTAnalysis(x, fs)
@@ -266,8 +280,6 @@ function data_viz(data, dataid)
     plot(d(2).frequency, d(2).amplitude); 
     xlabel('Frequency(Sec)'); ylabel('Faulty Spectrum');  xlim([0,200]);
     linkaxes(ax,'xy');
-
-
 end
 
 function alldata = data_loading(filepath)
@@ -282,11 +294,6 @@ function alldata = data_loading(filepath)
         alldata = [];
         return;
     end
-    
-    % Predefine alldata with a size based on N
-    %alldata(N) = struct('signal', [], 'label', []); % Allocate space for N elements
-    
-
 
     % loop for each file
     for i = 1:N
@@ -310,9 +317,6 @@ function alldata = data_loading(filepath)
                 alldata(i).label = 0;
         else
                 alldata(i).label = nan;
-        end
-        
+        end 
     end
-    
-
 end
