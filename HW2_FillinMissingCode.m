@@ -36,21 +36,12 @@ function main()
     feamat = [traindata.feature]';
     label = [traindata.label]';
 
-    disp(size(label));
-    disp(unique(label));
-
 % Please use the "twoclass_fisher" subfunction to compute the fisher score
 % for individual features
 %     **********************************************************************************************
 %     **     
 %     ** 
-
-     X = feamat;
-     y = [traindata.label]';
-     fscore = twoclass_fisher(X,y);
-
-
-%     **                      Please fill in your code here !                                                       **
+     fscore = twoclass_fisher(feamat,label);
 %     **                                                                                                                              **
 %     **********************************************************************************************
 
@@ -65,7 +56,6 @@ function main()
 % the matlab function "mapstd" is recommended
 %     **********************************************************************************************
 %     **                                                                                                                              ** 
-%     **                      Please fill in your code here !  
     [traindataNormalized,PS] = mapstd(feamat) 
 %     **                                                                                                                              **
 %     **********************************************************************************************
@@ -78,14 +68,8 @@ function main()
 % the matlab function "glmfit" is recommended
 %     **********************************************************************************************
 %     ** 
-
-    % b (bias), dev (model deviance), stats (miscellaneous statistics)
-    % glmval predicts the label (0 or 1, faulty or healthy) for new data
-    % [0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1]
-    [b, dev, stats] = glmfit(traindataNormalized, label, 'binomial');
+    [b, dev, stats] = glmfit(traindataNormalized, label, 'binomial', 'logit');
     prob = glmval(b, traindataNormalized, 'logit');
-
-%     **                      Please fill in your code here !                                                       **
 %     **                                                                                                                              **
 %     **********************************************************************************************
 
@@ -109,8 +93,7 @@ function main()
 % Please fill in the  feature normalization code for the testing data
 % the matlab function "mapstd" is recommended
 %     **********************************************************************************************
-%     **                                                                                                                              ** 
-%     **                      Please fill in your code here !    
+%     **                                                                                                                              **     
     [testdataNormalized,PS] = mapstd(testfeamat) 
 %     **                                                                                                                              **
 %     **********************************************************************************************
@@ -120,10 +103,8 @@ function main()
 % the matlab function "glmval" is recommended. Output of the function
 % should be define as variable "cv"
 %     **********************************************************************************************
-%     **                                                                                                                              ** 
-%     **                      Please fill in your code here !
+%     **                                                                                                                              **
     cv = glmval(b, testdataNormalized, 'logit');
-
 %     **                                                                                                                              **
 %     **********************************************************************************************
     figure; plot(cv,'x-'); xlabel('Sample ID'); ylabel('Health Value')
@@ -231,15 +212,12 @@ function [t, f, amp]= FFTAnalysis(x, fs)
     % information
 %     **********************************************************************************************
 %     **                                                                                                                              ** 
-%     **                      Please fill in your code here !                                                       **
-%     **                                                                                                                              **
-%     **********************************************************************************************
-
-    % Inside the FFTAnalysis function after defining f
     X_fft = fft(x);
     amp = abs(X_fft/N); % N is the length of your signal x
     amp = amp(1:N/2+1);
     amp(2:end-1) = 2*amp(2:end-1);
+%     **                                                                                                                              **
+%     **********************************************************************************************
 
     
     f = f(f<=fnyq); 
@@ -255,6 +233,7 @@ function data_viz(data, dataid)
 % visualization
 
 %Generating the time and frequency scale of the signal
+
     d= data(dataid);
 
     figure;
@@ -273,26 +252,20 @@ function data_viz(data, dataid)
     plot(d(2).frequency, d(2).amplitude); 
     xlabel('Frequency(Sec)'); ylabel('Faulty Spectrum');  xlim([0,200]);
     linkaxes(ax,'xy');
+
+
 end
 
 function alldata = data_loading(filepath)
     matlab_version = 0; %leave as 1 if runninng matlab 2018. change to 0 if using matlab 2021
 
     files = dir([filepath,'/*.txt']) ;   % you are in the folder of files
-    fprintf('filepath is: %s ', filepath);
     N = length(files) ;
-
-    if N == 0
-        warning('No files found in the specified directory.');
-        alldata = [];
-        return;
-    end
 
     % loop for each file
     for i = 1:N
         thisfile =[files(i).folder,'/', files(i).name];
         fprintf('Converting data file %s \n', thisfile)
-
         T = readtable(thisfile);
         if matlab_version == 1
             T = table2array(T(5:end,1));
@@ -310,6 +283,9 @@ function alldata = data_loading(filepath)
                 alldata(i).label = 0;
         else
                 alldata(i).label = nan;
-        end 
+        end
+
     end
+    
+    
 end
