@@ -54,7 +54,7 @@ function main()
     figure; bar(fscore); xlabel('Feature'); ylabel('Fischer Score');
 
     % fscore>4;
-    feaid = fscore>1;  % selected feature ID for model training
+    %feaid = fscore>1;  % selected feature ID for model training
     %feamat = feamat(:,feaid);
     %% Feature Normalization - Training Data
 
