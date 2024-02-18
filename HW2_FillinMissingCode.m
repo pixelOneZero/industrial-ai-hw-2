@@ -1,10 +1,15 @@
 function main()
     close all;
+
     %% Data Loading
-    filepath = './Training/Faulty/';
+    filepathFaultyUnbalanced1 = './Training/Faulty/Unbalance 1';
+    filepathFaultyUnbalanced2 = './Training/Faulty/Unbalance 2';
+
     filepathHealthy = './Training/Healthy/';
     traindata = data_loading(filepathHealthy);
-    traindata = [traindata, data_loading(filepath)];
+    % Append training data subfolders for faulty/unbalanced cases
+    traindata = [traindata, data_loading(filepathFaultyUnbalanced1)];
+    traindata = [traindata, data_loading(filepathFaultyUnbalanced2)];
 
     filepathTesting = './Testing/'; testdata = data_loading(filepathTesting);
 
@@ -48,15 +53,16 @@ function main()
 
     figure; bar(fscore); xlabel('Feature'); ylabel('Fischer Score');
 
+    % fscore>4;
     feaid = fscore>1;  % selected feature ID for model training
-    feamat = feamat(:,feaid);
+    %feamat = feamat(:,feaid);
     %% Feature Normalization - Training Data
 
 % Please fill in the feature normalization code for the training data
 % the matlab function "mapstd" is recommended
 %     **********************************************************************************************
 %     **                                                                                                                              ** 
-    [traindataNormalized,PS] = mapstd(feamat) 
+    [traindataNormalized,~] = mapstd(feamat);
 %     **                                                                                                                              **
 %     **********************************************************************************************
 
@@ -68,7 +74,7 @@ function main()
 % the matlab function "glmfit" is recommended
 %     **********************************************************************************************
 %     ** 
-    [b, dev, stats] = glmfit(traindataNormalized, label, 'binomial', 'logit');
+    [b, ~, ~] = glmfit(traindataNormalized, label, 'binomial', 'logit');
     prob = glmval(b, traindataNormalized, 'logit');
 %     **                                                                                                                              **
 %     **********************************************************************************************
@@ -81,12 +87,12 @@ function main()
         testdata(k).frequency = f;
         testdata(k).amplitude = amp;
 
-        [feavec,feaname] = feature_extraction(testdata(k));
+        [feavec, ~] = feature_extraction(testdata(k));
         testdata(k).feature = feavec;
     end
 
     testfeamat = [testdata.feature]';
-    testfeamat = testfeamat(:, feaid); % retain the useful features
+    %testfeamat = testfeamat(:, feaid); % retain the useful features
     
     %% Feature Normalization  - Testing Data
 
@@ -94,7 +100,7 @@ function main()
 % the matlab function "mapstd" is recommended
 %     **********************************************************************************************
 %     **                                                                                                                              **     
-    [testdataNormalized,PS] = mapstd(testfeamat) 
+    [testdataNormalized, ~] = mapstd(testfeamat);
 %     **                                                                                                                              **
 %     **********************************************************************************************
     
@@ -107,8 +113,75 @@ function main()
     cv = glmval(b, testdataNormalized, 'logit');
 %     **                                                                                                                              **
 %     **********************************************************************************************
-    figure; plot(cv,'x-'); xlabel('Sample ID'); ylabel('Health Value')
+ %   figure; plot(cv,'x-'); xlabel('Sample ID'); ylabel('Health Value')
+    % number of samples of each cluster
+K = length(testdataNormalized);
+% offset of classes
+q = 1.1;
+% define 4 clusters of input data
+%P = [testdataNormalized];
+%P = [rand(1,K)-q rand(1,K)+q rand(1,K)+q rand(1,K)-q;
+%     rand(1,K)+q rand(1,K)+q rand(1,K)-q rand(1,K)-q];
+P = [transpose(testdataNormalized)-q transpose(testdataNormalized)+q transpose(testdataNormalized)+q transpose(testdataNormalized)-q;
+    transpose(testdataNormalized)+q transpose(testdataNormalized)+q transpose(testdataNormalized)-q transpose(testdataNormalized)-q;]
+% plot clusters
+figure
+plot(P(1,:),P(2,:),'k*')
+hold on
+grid on
+%%
 
+% SOM parameters
+dimensions   = [10 10];
+coverSteps   = 500;
+initNeighbor = 4;
+topologyFcn  = 'hextop';
+distanceFcn  = 'linkdist';
+
+% define net
+net = selforgmap(dimensions,coverSteps,initNeighbor,topologyFcn,distanceFcn);
+plotsomtop(net)
+
+%%
+% train
+[net,Y] = train(net,P);
+
+%%
+% plot input data and SOM weight positions
+plotsomtop(net)
+plotsompos(net,P);
+grid on
+
+% plot SOM neighbor distances
+plotsomnd(net)
+
+% plot for each SOM neuron the number of input vectors that it classifies
+figure
+plotsomhits(net,P);
+%% find BMU and Calculate MQE
+
+% net.IW weight matrices of weights going to layers from network inputs
+Weights = net.IW{1,1};
+figure
+plot(P(1,:),P(2,:),'k*')
+hold on
+plot(Weights(:,1),Weights(:,2),'g.')
+
+% pick one sample
+%Sample = P(:,1);
+Sample = [0.5;0.5];
+plot(Sample(1),Sample(2),'r*')
+
+% find bmu
+Hits = sim(net,Sample);
+L = find(Hits==1);
+BMU = Weights(L,:);
+plot(BMU(1),BMU(2),'ro')
+
+% MQE
+MQE = norm(BMU'-Sample);
+figure
+plotsomhits(net,Sample);
 end
 
 function fscore=twoclass_fisher(X,y)
@@ -174,8 +247,9 @@ function [feavec,feaname] = feature_extraction(d)
         targetFreq = freqRanges(i);
         freqWindow = (f >= (targetFreq - 5)) & (f <= (targetFreq + 5));
         if any(freqWindow)
+            %non0 = find(freqWindow, 1);
             % Calculate mean amplitude in the frequency window as a feature
-            feavec(4+i) = mean(amp(freqWindow));
+            feavec(4+i) = mean(amp(freqWindow)); % min(amp(freqWindow))
         else
             feavec(4+i) = 0; % If no frequencies are in the window, set feature to 0
         end
@@ -265,7 +339,7 @@ function alldata = data_loading(filepath)
     % loop for each file
     for i = 1:N
         thisfile =[files(i).folder,'/', files(i).name];
-        fprintf('Converting data file %s \n', thisfile)
+        %fprintf('Converting data file %s \n', thisfile);
         T = readtable(thisfile);
         if matlab_version == 1
             T = table2array(T(5:end,1));
