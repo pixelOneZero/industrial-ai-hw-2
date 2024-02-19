@@ -138,7 +138,7 @@ grid on
 %%
 
 % SOM parameters
-dimensions   = [10 10];
+dimensions   = [5 5];
 coverSteps   = 500;
 initNeighbor = 4;
 topologyFcn  = 'hextop';
@@ -152,50 +152,80 @@ net = selforgmap(dimensions,coverSteps,initNeighbor,topologyFcn,distanceFcn);
 
 
 % Begin: Prepare data for confusion matrix
-%{
 
-testdataNormalizedT = transpose(testdataNormalized);  % Prepare test data
+% Number of neurons in the SOM
+numNeurons = prod(dimensions); % Assuming 'dimensions' is defined as [rows, cols]
 
-% Find BMUs for test data
-testHits = sim(net, testdataNormalizedT);
+% Initialize a cell array to hold labels for each neuron
+neuronLabels = cell(numNeurons, 1);
 
-% Extract actual labels for test data
-actualLabels = [testdata.label]';  % Assuming 'label' field exists in testdata structure
+traindataNormalizedT = transpose(traindataNormalized);
 
-% Initialize predicted labels array
-predictedLabels = zeros(size(actualLabels));
-
-% Assign labels to neurons in the SOM based on training data (not shown here)
-% neuronLabels = ...
-
-for i = 1:length(testdata)
-    [~, bmuIndex] = max(testHits(:,i));  % Find BMU index for each test sample
-    predictedLabels(i) = neuronLabels(bmuIndex);  % Assign neuron's label as predicted label
+% For each training data point
+for i = 1:size(traindataNormalizedT, 1) 
+    % Find the BMU for this data point
+    sample = traindataNormalizedT(:, i);
+    bmuIndex = vec2ind(net(sample));
+    
+    % Append the label of this data point to the neuron's list of labels
+    currentLabel = traindata(i).label; % Assuming each entry in traindata has a 'label' field
+    neuronLabels{bmuIndex} = [neuronLabels{bmuIndex}; currentLabel];
 end
 
-% Create confusion matrix
-[C,~] = confusionmat(actualLabels, predictedLabels);
+% Determine the most common label for each neuron
+bmuLabelMapping = zeros(numNeurons, 1);
+for i = 1:numNeurons
+    if ~isempty(neuronLabels{i})
+        bmuLabelMapping(i) = mode(neuronLabels{i});
+    else
+        bmuLabelMapping(i) = NaN; % Handle neurons that didn't act as BMU for any data point
+    end
+end
 
-%}
 % End: Prepare data for confusion matrix
 
+% Begin: Find common label for each neuron
 
-% Begin: Calculate Quantization Errors for each test sample
-%{
+% Initialize array to store predicted labels for test data
+predictedLabels = zeros(1, length(testdata));
 
-qe = zeros(1, length(testdata));
+testdataNormalizedT = transpose(testdataNormalized);
+
+% Classify each test sample
 for i = 1:length(testdata)
-    sample = testdataNormalizedT(:,i);
-    bmu = net.IW{1}(bmuIndex,:);  % Assuming bmuIndex is obtained as shown earlier
-    qe(i) = norm(sample - bmu');
+    testSample = testdataNormalizedT(:, i);
+    bmuIndex = vec2ind(net(testSample)); % Find BMU for the test sample
+    predictedLabel = bmuLabelMapping(bmuIndex); % Use BMU's label as the predicted label
+    predictedLabels(i) = predictedLabel;
 end
 
-% Calculate MQE
-mqe = mean(qe);
+% End: Find common label for each neuron
 
-%}
-% End: Calculate Quantization Errors for each test sample
 
+% Begin: Display confusion matrix
+
+% Assuming testLabelData contains the actual labels for the test data
+% and predictedLabels contains the labels predicted by your SOM
+
+testLabelData = [testdata.label]; % or [testdata.label] if labels are stored in testdata structure
+
+% Calculate the confusion matrix
+[C, order] = confusionmat(testLabelData, predictedLabels);
+
+% Display the confusion matrix
+disp('Confusion Matrix:');
+disp(C);
+
+hold off;
+% Create a confusion matrix chart
+confusionChart = confusionchart(C, order);
+
+% Optionally, customize the chart appearance
+confusionChart.Title = 'Confusion Matrix';
+confusionChart.RowSummary = 'row-normalized'; % Normalize by rows
+confusionChart.ColumnSummary = 'column-normalized'; % Normalize by columns
+
+% End: Display confusion matrix
 
 %%
 % plot input data and SOM weight positions
