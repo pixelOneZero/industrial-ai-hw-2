@@ -1,17 +1,17 @@
 function main()
-    close all;
+    close all, clear all, clc, format compact;
 
     %% Data Loading
     filepathFaultyUnbalanced1 = './Training/Faulty/Unbalance 1';
     filepathFaultyUnbalanced2 = './Training/Faulty/Unbalance 2';
-
     filepathHealthy = './Training/Healthy/';
     traindata = data_loading(filepathHealthy);
     % Append training data subfolders for faulty/unbalanced cases
     traindata = [traindata, data_loading(filepathFaultyUnbalanced1)];
     traindata = [traindata, data_loading(filepathFaultyUnbalanced2)];
-
-    filepathTesting = './Testing/'; testdata = data_loading(filepathTesting);
+    filepathTesting = './Testing/';
+    testdata = data_loading(filepathTesting);
+    testLabelData = [1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,3,3];
 
     %% FFT Analysis  on Training Data
     fs = 2560; % Hz
@@ -24,8 +24,8 @@ function main()
     end
 
     %% Data Visualization on Training Data
-    dataid= [1,21];  % change the sample id to visualize different data
-    data_viz(traindata, dataid);
+    dataid = [1,21];  % change the sample id to visualize different data
+    %data_viz(traindata, dataid);
 
     %% Feature Extraction on Training Data
     for k = 1:length(traindata)
@@ -34,8 +34,13 @@ function main()
         traindata(k).feature = feavec;
     end
 
+    %% Add label data to test data for SOM
+    for i = 1:length(testdata)
+        testdata(i).label = testLabelData(i);
+    end
+
     %% Feature Visualization - Training Data
-    feature_viz(traindata,feaname);
+    %feature_viz(traindata,feaname);
 
     %% Feature Selection - Training Data
     feamat = [traindata.feature]';
@@ -46,16 +51,19 @@ function main()
 %     **********************************************************************************************
 %     **     
 %     ** 
-     fscore = twoclass_fisher(feamat,label);
+    fscore = twoclass_fisher(feamat,label);
 %     **                                                                                                                              **
 %     **********************************************************************************************
 
+    figure('Name','Fischer Score');
+    bar(fscore);
+    title('Fischer Score');
+    xlabel('Feature');
+    ylabel('Fischer Score');
 
-    figure; bar(fscore); xlabel('Feature'); ylabel('Fischer Score');
+    feaid = fscore > 1;  % selected feature ID for model training
+    feamat = feamat(:,feaid);
 
-    % fscore>4;
-    %feaid = fscore>1;  % selected feature ID for model training
-    %feamat = feamat(:,feaid);
     %% Feature Normalization - Training Data
 
 % Please fill in the feature normalization code for the training data
@@ -67,15 +75,15 @@ function main()
 %     **********************************************************************************************
 
     %% Model Training
-    label(label==1) = 0.95; % this treatment avoids numerical instability
-    label(label==0) = 0.05;
+    label(label==3) = 2.95; % this treatment avoids numerical instability
+    label(label==2) = 1.95; % this treatment avoids numerical instability
+    label(label==1) = 0.95;
     
 % Please fill in the model training code for logistic regression
 % the matlab function "glmfit" is recommended
 %     **********************************************************************************************
 %     ** 
-    [b, ~, ~] = glmfit(traindataNormalized, label, 'binomial', 'logit');
-    prob = glmval(b, traindataNormalized, 'logit');
+    [b, ~, ~] = glmfit(traindataNormalized, label);
 %     **                                                                                                                              **
 %     **********************************************************************************************
 
@@ -92,7 +100,7 @@ function main()
     end
 
     testfeamat = [testdata.feature]';
-    %testfeamat = testfeamat(:, feaid); % retain the useful features
+    testfeamat = testfeamat(:, feaid); % retain the useful features
     
     %% Feature Normalization  - Testing Data
 
@@ -113,20 +121,18 @@ function main()
     cv = glmval(b, testdataNormalized, 'logit');
 %     **                                                                                                                              **
 %     **********************************************************************************************
- %   figure; plot(cv,'x-'); xlabel('Sample ID'); ylabel('Health Value')
-    % number of samples of each cluster
-K = length(testdataNormalized);
+
+figure('Name', 'Logistic Regression');
+plot(cv,'x-');
+title('Logistic Regression');
+xlabel('Sample ID');
+ylabel('Health Value');
+
 % offset of classes
-q = 1.1;
-% define 4 clusters of input data
-%P = [testdataNormalized];
-%P = [rand(1,K)-q rand(1,K)+q rand(1,K)+q rand(1,K)-q;
-%     rand(1,K)+q rand(1,K)+q rand(1,K)-q rand(1,K)-q];
-P = [transpose(testdataNormalized)-q transpose(testdataNormalized)+q transpose(testdataNormalized)+q transpose(testdataNormalized)-q;
-    transpose(testdataNormalized)+q transpose(testdataNormalized)+q transpose(testdataNormalized)-q transpose(testdataNormalized)-q;]
-% plot clusters
-figure
-plot(P(1,:),P(2,:),'k*')
+P = [transpose(traindataNormalized)];
+
+figure('Name','Clusters');
+plot(P(1,:),P(2,:),'k*');
 hold on
 grid on
 %%
@@ -140,54 +146,106 @@ distanceFcn  = 'linkdist';
 
 % define net
 net = selforgmap(dimensions,coverSteps,initNeighbor,topologyFcn,distanceFcn);
-plotsomtop(net)
 
-%%
 % train
-[net,Y] = train(net,P);
+[net,tr] = train(net,P);
+
+
+% Begin: Prepare data for confusion matrix
+%{
+
+testdataNormalizedT = transpose(testdataNormalized);  % Prepare test data
+
+% Find BMUs for test data
+testHits = sim(net, testdataNormalizedT);
+
+% Extract actual labels for test data
+actualLabels = [testdata.label]';  % Assuming 'label' field exists in testdata structure
+
+% Initialize predicted labels array
+predictedLabels = zeros(size(actualLabels));
+
+% Assign labels to neurons in the SOM based on training data (not shown here)
+% neuronLabels = ...
+
+for i = 1:length(testdata)
+    [~, bmuIndex] = max(testHits(:,i));  % Find BMU index for each test sample
+    predictedLabels(i) = neuronLabels(bmuIndex);  % Assign neuron's label as predicted label
+end
+
+% Create confusion matrix
+[C,~] = confusionmat(actualLabels, predictedLabels);
+
+%}
+% End: Prepare data for confusion matrix
+
+
+% Begin: Calculate Quantization Errors for each test sample
+%{
+
+qe = zeros(1, length(testdata));
+for i = 1:length(testdata)
+    sample = testdataNormalizedT(:,i);
+    bmu = net.IW{1}(bmuIndex,:);  % Assuming bmuIndex is obtained as shown earlier
+    qe(i) = norm(sample - bmu');
+end
+
+% Calculate MQE
+mqe = mean(qe);
+
+%}
+% End: Calculate Quantization Errors for each test sample
+
 
 %%
 % plot input data and SOM weight positions
-plotsomtop(net)
+figure;
+plotsomtop(net);
+figure;
 plotsompos(net,P);
 grid on
 
 % plot SOM neighbor distances
+figure;
 plotsomnd(net)
 
 % plot for each SOM neuron the number of input vectors that it classifies
-figure
+figure;
 plotsomhits(net,P);
+
 %% find BMU and Calculate MQE
 
 % net.IW weight matrices of weights going to layers from network inputs
 Weights = net.IW{1,1};
-figure
-plot(P(1,:),P(2,:),'k*')
-hold on
-plot(Weights(:,1),Weights(:,2),'g.')
+figure('Name','net.IW weight matrices');
+title('net.IW weight matrices');
+plot(Weights(:,1),...
+     Weights(:,2), '*',...
+    'MarkerSize', 12);
 
 % pick one sample
-%Sample = P(:,1);
-Sample = [0.5;0.5];
-plot(Sample(1),Sample(2),'r*')
+Sample = P(:,1);
+%figure;
+%plot(Sample(1),Sample(2),'r*');
 
 % find bmu
 Hits = sim(net,Sample);
 L = find(Hits==1);
 BMU = Weights(L,:);
-plot(BMU(1),BMU(2),'ro')
+figure('Name','Best Matching Unit (BMU)');
+plot(BMU(1),BMU(2),'o');
 
 % MQE
 MQE = norm(BMU'-Sample);
-figure
+figure;
 plotsomhits(net,Sample);
+
 end
 
 function fscore=twoclass_fisher(X,y)
     uniclass = unique(y);
     
-    for k = 1:2
+    for k = 1:3
 
             idxk = find( y==uniclass(k) ); nk = length(idxk);
             Xk = X(idxk,:);
@@ -307,10 +365,10 @@ function data_viz(data, dataid)
 % visualization
 
 %Generating the time and frequency scale of the signal
-
+    
     d= data(dataid);
 
-    figure;
+    figure('Name','Time Series for Signal & Spectrum');
     ax(1) = subplot(221);
     plot(d(1).time, d(1).signal); 
     xlabel('Time(Sec)'); ylabel('Health Signal'); 
@@ -326,8 +384,6 @@ function data_viz(data, dataid)
     plot(d(2).frequency, d(2).amplitude); 
     xlabel('Frequency(Sec)'); ylabel('Faulty Spectrum');  xlim([0,200]);
     linkaxes(ax,'xy');
-
-
 end
 
 function alldata = data_loading(filepath)
@@ -351,15 +407,14 @@ function alldata = data_loading(filepath)
         alldata(i).signal = T;
         
         fname = files(i).name;
-        if strcmpi(fname(1:6), 'Normal')
-            alldata(i).label = 1;
-        elseif strcmpi(fname(1:11), 'Unbalance 2')
-                alldata(i).label = 0;
+        if contains(lower(fname), 'normal')
+            alldata(i).label = 1; % Normal
+        elseif contains(lower(fname), 'unbalance 1')
+            alldata(i).label = 2; % Unbalance 1
+        elseif contains(lower(fname), 'unbalance 2')
+            alldata(i).label = 3; % Unbalance 2
         else
-                alldata(i).label = nan;
+            alldata(i).label = nan; % Undefined/unknown class
         end
-
     end
-    
-    
 end
